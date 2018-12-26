@@ -18,17 +18,75 @@ Template.knagToKnag.onCreated(function(){
     
 });
 
-function getEdges(fromNode, toNode = ""){
-    // Here let's do what mongoDB is not build for!
-    // (a simple relational query)
-    // use $lookup and aggregate
+function getAllNodes(){
 
-    return Edges.find({});
+}
+
+function getNodesFrom(fromNode){
+
+}
+
+function getNodesBtn(fromNode, toNode){
+    // Here let's do what mongoDB is not build for!
+    // (a simple relational query on a self join)
+    // use $lookup and aggregate
+    var edges = Edges.find({
+        nodes: {
+            $in: [fromNode, toNode]
+        }
+    }).fetch();
+
+    /*edges = Edges.aggregate({
+        { $match: {
+            nodes: { $in: [fromNode, toNode] }
+        }},
+        { $group: {
+
+        }}
+    })*/
+
+    console.log(edges)
+    var results = new Set();
+    for (let i = 0; i < edges.length; ++i){
+        let edge = edges[i];
+
+        // for "fromNode", check if can find other nodes connected to "toNode"
+        let otherNode = edge.nodes.find((node) => node !== fromNode);
+        let otherEdgeToOk = edges.find((e2) => e2.nodes.includes(otherNode) && e2.nodes.includes(toNode));
+        if (otherEdgeToOk){
+            results.add(otherNode);
+            continue;
+        }
+
+        // for "toNode"
+        otherNode = edge.nodes.find((node) => node !== toNode);
+        otherEdgeToOk = edges.find((e2) => e2.nodes.includes(otherNode) && e2.nodes.includes(fromNode));
+        if (otherEdgeToOk){
+            results.add(otherNode);
+            continue;
+        }
+    }
+
+    return [...results];
 }
 
 function getNodes(fromNode, toNode = ""){
+    var edges = Edges.find({
+        $or: [
+            {f: fromNode},
+            {f: toNode},
+            {t: fromNode},
+            {t: toNode}
+        ]
+    }); //getEdges(fromNode, toNode);
+
     var nodeNames = new Set()
-    var edges = getEdges(fromNode, toNode);
+    edges.forEach((edge) => {
+
+    });
+
+
+    
     edges.forEach((doc) => {
         nodeNames.add(doc.f);
         nodeNames.add(doc.t);
@@ -38,20 +96,7 @@ function getNodes(fromNode, toNode = ""){
 
 Template.knagToKnag.helpers({
     relatedNodes(){
-        return getNodes({
-            $or: [
-                {f: fromNode, t: toNode},
-                {f: toNode, f: fromNode}
-            ]
-        });
-    },
-    nodes(){
-        return Nodes.find({});
-    },
-    edges(){
-        return Edges.find({
-            
-        });
+        return getNodesBtn(fromNode, toNode);
     },
 
     fromNode(){
@@ -87,18 +132,12 @@ Template.knagToKnag.events({
         let val = document.getElementById('newKnag').value;
         if (val === "") return;
 
-        /*Nodes.insert({
-            name: val
-        });*/
         Edges.insert({
-            f: fromNode,
-            t: val
+            nodes: [fromNode, val]
         });
         Edges.insert({
-            f: val,
-            t: toNode
+            nodes: [val, toNode]
         });
-        
     },
 
     'submit .showKnags': function(e){
@@ -119,25 +158,19 @@ Template.knagToKnag.events({
         e.preventDefault();
 
         const nodeName = e.target.getAttribute('data-node');
-        /*const node = Nodes.findOne({
-            name: nodeName
-        });
-        Nodes.remove({
-            _id : node._id
-        });*/
-        var ids = Edges.find({
-            t: nodeName,
-            f: [fromNode, toNode]
-        }, {_id: 1}).fetch();
-        if (ids.length > 0)
-            Edges.remove({_id: ids});
 
-        ids = Edges.find({
-            t: [fromNode, toNode],
-            f: nodeName
-        }, {_id: 1}).fetch();
-        if (ids.length > 0)
-            Edges.remove({_id: ids});
+        var ids = Edges.find({
+            $or: [
+                {nodes: [fromNode, nodeName]},
+                {nodes: [nodeName, toNode]}
+            ]
+        }, {_id: 1});
+
+        ids.forEach((edge) => {
+            console.log(edge);
+            Edges.remove({_id: edge._id});    
+        });
+            
     }
 });
 
