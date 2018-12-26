@@ -15,20 +15,29 @@ const toNode = url.searchParams.get("to");
 
 Template.knagToKnag.onCreated(function(){
     //document.getElementById('newKnag').focus();
-    
 });
 
 function getAllNodes(){
     let allNodes = Edges.find().fetch().map(e => e.nodes);
     let allNodesFlat = [].concat.apply([], allNodes).filter(x => x !== undefined);
+    //console.log(allNodesFlat)
     return [...new Set(allNodesFlat)].sort();
 }
 
 function getNodesFrom(fromNode){
+    var edges = Edges.find({
+        nodes: {
+            $in: [fromNode]
+        }
+    }).fetch();
 
+    return edges.map((edge) => edge.nodes[0] + " - " + edge.nodes[1]);
 }
 
 function getNodesBtn(fromNode, toNode){
+    // Special view (fast fix, should do proper routing + views)
+    if (toNode === "") return getNodesFrom(fromNode);
+
     // Here let's do what mongoDB is not build for!
     // (a simple relational query on a self join)
     // use $lookup and aggregate
@@ -37,15 +46,6 @@ function getNodesBtn(fromNode, toNode){
             $in: [fromNode, toNode]
         }
     }).fetch();
-
-    /*edges = Edges.aggregate({
-        { $match: {
-            nodes: { $in: [fromNode, toNode] }
-        }},
-        { $group: {
-
-        }}
-    })*/
 
     var results = new Set();
     for (let i = 0; i < edges.length; ++i){
@@ -82,24 +82,6 @@ Template.knagToKnag.helpers({
     }
 });
 
-/*Template.hello.onCreated(function helloOnCreated() {
-  // counter starts at 0
-  this.counter = new ReactiveVar(0);
-});
-
-Template.hello.helpers({
-  counter() {
-    return Template.instance().counter.get();
-  },
-});*/
-
-/*Template.hello.events({
-  'click button'(event, instance) {
-    // increment the counter when button is clicked
-    instance.counter.set(instance.counter.get() + 1);
-  },
-});*/
-
 Template.knagToKnag.events({
     'submit .newKnagForm': function(e, template){
         e.preventDefault();
@@ -113,7 +95,8 @@ Template.knagToKnag.events({
         }).count();
         if (alreadyExists === 0)
             Edges.insert({
-                nodes: [fromNode, val]
+                nodes: [fromNode, val],
+                created: new Date()
             });
 
         // insert second edge if not already exists
@@ -122,8 +105,15 @@ Template.knagToKnag.events({
         }).count();
         if (alreadyExists2 === 0)
             Edges.insert({
-                nodes: [val, toNode]
+                nodes: [val, toNode],
+                created: new Date()
             });
+    },
+
+    'keydown #newKnag': function(e){
+        if (e.which === 71){
+            document.getElementById('knag1').focus();
+        }
     },
 
     'submit .showKnags': function(e){
