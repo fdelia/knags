@@ -15,11 +15,14 @@ const toNode = url.searchParams.get("to");
 
 Template.knagToKnag.onCreated(function(){
     //document.getElementById('newKnag').focus();
-    //console.log(this.props)
-
+    
 });
 
 function getEdges(fromNode, toNode = ""){
+    // Here let's do what mongoDB is not build for!
+    // (a simple relational query)
+    // use $lookup and aggregate
+
     return Edges.find({});
 }
 
